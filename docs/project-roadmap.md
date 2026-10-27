@@ -1,16 +1,15 @@
 # Project Roadmap
 
-Last updated: 2026-06-27
+Last updated: 2026-10-27
 
-## Current Status: Version 0.2.0
+## Current Status: Unreleased wave on top of 0.3.0
 
-The Personal OTP Vault is at v0.2.0 with the hardening wave shipped: KDF
-parameterization (600k PBKDF2 envelope), auto-lock and unlock throttling,
-HOTP + SHA-256/512 support, Google Authenticator migration import, undo-delete
-with tombstone, backup reminder, time-drift check, WebAuthn PRF biometric
-unlock (two-envelope DEK design), dark mode, drag & drop reorder, per-entry
-countdown rings, an accessibility pass, and an i18n framework — in both the
-PWA and the Chrome extension.
+The Personal OTP Vault shipped the 0.3.0 product UI redesign (token system,
+codes-first shell, slide-over sheets) and is carrying an unreleased
+migration-and-language wave: Aegis + 2FAS import, single-entry QR export,
+complete i18n with a full Vietnamese translation plus a Language setting, an
+extension keyboard shortcut, and backup format v3 with a keyed HMAC checksum
+(authenticity, closing the integrity-only caveat).
 
 ## Completed Features (Done)
 
@@ -32,7 +31,20 @@ PWA and the Chrome extension.
 - ✅ **Privacy Features**: Code blurring, screenshot-safe mode, clipboard clear
 - ✅ **Visual Feedback**: Per-entry countdown rings, urgent indicators, dark mode (System/Light/Dark)
 - ✅ **Accessibility**: Axe-scanned views (zero criticals), keyboard-reachable controls, announced toasts
-- ✅ **i18n Framework**: `lib/i18n.js` English catalog; unlock + settings areas read strings via `t()`
+- ✅ **i18n Framework**: `lib/i18n.js` with complete English + Vietnamese
+  catalogs; all user-visible strings in both frontends resolve through `t()`
+  (static HTML via `data-i18n*` attributes), with a Language setting
+  (System/English/Tiếng Việt)
+- ✅ **Third-Party App Import**: Aegis plain-text JSON and 2FAS backups decode
+  into the shared import preview (`lib/importers.js`); encrypted Aegis
+  exports are rejected with guidance
+- ✅ **Single-Entry QR Export**: per-entry QR of the `otpauth://` URI
+  (`buildOtpAuthUri`, vendored `qrcode` encoder) with Copy URI and Download
+  PNG, in both frontends
+- ✅ **Extension Keyboard Shortcut**: `Ctrl+Shift+U` / `Cmd+Shift+U` opens
+  the popup (MV3 `commands`)
+- ✅ **Backup Format v3**: encrypted backups carry a keyed HMAC-SHA256
+  checksum for authenticity (verified before decryption); v1/v2 still import
 
 ### Testing and Quality Assurance
 - ✅ **Unit Tests**: Vitest coverage for `lib/` modules
@@ -50,13 +62,13 @@ PWA and the Chrome extension.
 
 ## In Progress (None Confirmed)
 
-No confirmed in-progress items at this time. The project is in maintenance mode for v0.1.x while gathering user feedback and usage patterns.
+No confirmed in-progress items at this time.
 
 ## Future Themes (Proposals)
 
-Deferred ideas recorded during the 0.2.0 cycle (not scheduled): 2FAS/Aegis
-export import, single-entry QR export, an extension keyboard shortcut, and a
-keyed (HMAC) backup checksum v3 for authenticity rather than integrity-only.
+Deferred ideas recorded during earlier cycles (not scheduled): Steam Guard
+format support, an extension Firefox/Safari port, incremental backups, and
+manual biometric hardware matrix testing.
 
 ### Enhanced QR Code Support (Future Proposal)
 **Rationale**: Current QR parsing focuses on standard `otpauth://` URIs. Some services use custom QR formats or Steam Guard's special encoding.
