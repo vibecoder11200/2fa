@@ -238,12 +238,9 @@ function applyLocale() {
   updateDataSafetyBanners();
   renderBiometricControls();
 }
-function applyStaticStrings() {
-  applyLocale();
-}
 
 function initialize() {
-  applyStaticStrings();
+  applyLocale();
   syncSettingsUI();
   applyVisualSettings();
   loadVaultOnStartup();
@@ -1833,7 +1830,8 @@ async function importFromQrBlob(blob, sourceLabel) {
   const candidates = buildPreviewCandidatesFromUris(uris, sourceLabel);
   openImportPreview(candidates, sourceLabel);
 }
-async function unlockVault(passphrase) {  const normalizedPassphrase = normalizePassphrase(passphrase);
+async function unlockVault(passphrase) {
+  const normalizedPassphrase = normalizePassphrase(passphrase);
   const payload = await readEncryptedVaultPayload();
   let decrypted;
   if (payload && isDekEncryptedPayload(payload)) {
@@ -2172,6 +2170,7 @@ async function changeVaultPassphrase(currentPassphraseCandidate, nextPassphraseC
   }
   releasePassphrase(previousPassphrase);
 }
+
 function renderBackupReview(backup) {
   if (!backupReviewSummary) return;
   backupReviewSummary.innerHTML = "";

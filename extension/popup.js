@@ -125,7 +125,6 @@ const migrationPreviewDialog = document.getElementById("migration-preview-dialog
 const migrationPreviewForm = document.getElementById("migration-preview-form");
 const migrationPreviewStatus = document.getElementById("migration-preview-status");
 const migrationPreviewList = document.getElementById("migration-preview-list");
-const migrationPreviewTitle = document.getElementById("migration-preview-title");
 const importAppsInput = document.getElementById("import-app-file");
 const languageSelect = document.getElementById("language-select");
 const qrExportDialog = document.getElementById("qr-export-dialog");
@@ -171,10 +170,6 @@ function applyLocale() {
   renderCopyHistory();
   renderBackupReminder();
   renderBiometricControls();
-}
-
-function applyStaticStrings() {
-  applyLocale();
 }
 
 initialize();
@@ -228,7 +223,7 @@ async function initialize() {
   if (settings.encrypt && stored[ENCRYPTED_KEY]) {
     await reconcileOrphanedBiometricRecord();
   }
-  applyStaticStrings();
+  applyLocale();
   bindEvents();
   bindPassphraseStrengthMeters();
   bindAutoLockActivity();
@@ -1811,7 +1806,6 @@ function bindEvents() {
         settings.theme = themeSelect.value;
         applyTheme();
       }
-      const languageSelect = document.getElementById("language-select");
       if (languageSelect) {
         settings.locale = languageSelect.value;
         applyLocale();

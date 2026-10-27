@@ -12551,10 +12551,13 @@ function buildLabel(issuer, name) {
   if (cleanName.toLowerCase().startsWith(`${cleanIssuer.toLowerCase()}:`)) return cleanName;
   return `${cleanIssuer}:${cleanName}`;
 }
+function looksLikeEncryptedAegis(data) {
+  return Array.isArray(data?.header?.slots) || Boolean(data?.header?.params);
+}
 function parseAegisExport(data) {
   const entriesRaw = data?.db?.entries;
   if (!Array.isArray(entriesRaw)) {
-    if (Array.isArray(data?.header?.slots) || data?.header?.params) {
+    if (looksLikeEncryptedAegis(data)) {
       throw malformed(
         "This Aegis export is encrypted. Re-export from Aegis with the plain-text (unencrypted) option and try again.",
         "IMPORT_ENCRYPTED_UNSUPPORTED"
@@ -12645,7 +12648,7 @@ function parseThirdPartyImport(rawText) {
     const { entries: entries2, warnings } = parse2FasExport(data);
     return { format: "2FAS", entries: entries2, warnings };
   }
-  if (Array.isArray(data.db?.entries) || Array.isArray(data.header?.slots) || data.header?.params) {
+  if (Array.isArray(data.db?.entries) || looksLikeEncryptedAegis(data)) {
     const { entries: entries2, warnings } = parseAegisExport(data);
     return { format: "Aegis", entries: entries2, warnings };
   }
@@ -13071,16 +13074,20 @@ function requireCrypto(cryptoApi = globalThis.crypto) {
   }
   return cryptoApi;
 }
+function toHex(buffer) {
+  return [...new Uint8Array(buffer)].map((part) => part.toString(16).padStart(2, "0")).join("");
+}
 async function sha256Hex(value, cryptoApi = globalThis.crypto) {
   const safeCrypto = requireCrypto(cryptoApi);
   const digest = await safeCrypto.subtle.digest("SHA-256", encoder.encode(value));
-  return [...new Uint8Array(digest)].map((part) => part.toString(16).padStart(2, "0")).join("");
+  return toHex(digest);
 }
 async function deriveBackupMacKey(passphrase, saltBytes, params, cryptoApi) {
   const safeCrypto = requireCrypto(cryptoApi);
-  const prefixedSalt = new Uint8Array(encoder.encode(BACKUP_MAC_INFO).length + saltBytes.length);
-  prefixedSalt.set(encoder.encode(BACKUP_MAC_INFO), 0);
-  prefixedSalt.set(saltBytes, encoder.encode(BACKUP_MAC_INFO).length);
+  const infoBytes = encoder.encode(BACKUP_MAC_INFO);
+  const prefixedSalt = new Uint8Array(infoBytes.length + saltBytes.length);
+  prefixedSalt.set(infoBytes, 0);
+  prefixedSalt.set(saltBytes, infoBytes.length);
   const material = await safeCrypto.subtle.importKey("raw", encoder.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
   return safeCrypto.subtle.deriveKey(
     { name: "PBKDF2", salt: prefixedSalt, iterations: params.iterations, hash: params.hash },
@@ -13094,7 +13101,7 @@ async function computeBackupMac(payloadJson, passphrase, saltBytes, params, cryp
   const safeCrypto = requireCrypto(cryptoApi);
   const macKey = await deriveBackupMacKey(passphrase, saltBytes, params, safeCrypto);
   const signature = await safeCrypto.subtle.sign("HMAC", macKey, encoder.encode(payloadJson));
-  return [...new Uint8Array(signature)].map((part) => part.toString(16).padStart(2, "0")).join("");
+  return toHex(signature);
 }
 function constantTimeHexEqual(left, right) {
   if (typeof left !== "string" || typeof right !== "string" || left.length !== right.length) return false;
@@ -13468,10 +13475,7 @@ async function migrateBackup(rawBackup) {
       };
     }
   }
-  if (rawBackup.version === 2) {
-    return rawBackup;
-  }
-  if (rawBackup.version === BACKUP_VERSION) {
+  if (rawBackup.version === 2 || rawBackup.version === BACKUP_VERSION) {
     return rawBackup;
   }
   throw new OtpVaultError("Backup version is not supported", { code: "BACKUP_VERSION" });
@@ -14830,11 +14834,11 @@ function resolveLocale(setting) {
   const candidate = typeof setting === "string" ? setting.trim() : "";
   if (candidate && catalogs.has(candidate)) return candidate;
   if (candidate && candidate !== "system") return DEFAULT_LOCALE;
-  const languages = typeof navigator !== "undefined" && Array.isArray(navigator.languages) ? navigator.languages : typeof navigator !== "undefined" && navigator.language ? [navigator.language] : [];
+  if (typeof navigator === "undefined") return DEFAULT_LOCALE;
+  const languages = Array.isArray(navigator.languages) ? navigator.languages : navigator.language ? [navigator.language] : [];
   for (const language of languages) {
     const lower = String(language).toLowerCase();
-    const exact = catalogs.get(lower) ? lower : null;
-    if (exact) return exact;
+    if (catalogs.has(lower)) return lower;
     const base = lower.split("-")[0];
     if (catalogs.has(base)) return base;
   }
@@ -14872,23 +14876,23 @@ function applyTranslations(root = typeof document !== "undefined" ? document : n
     if (typeof text === "string") node.setAttribute("title", text);
   }
 }
+var STRENGTH_LABEL_KEYS = {
+  "Very weak": "strength.veryWeak",
+  Weak: "strength.weak",
+  Fair: "strength.fair",
+  Good: "strength.good",
+  Strong: "strength.strong"
+};
+var STRENGTH_WARNING_KEYS = {
+  "Enter a passphrase": "strength.enterPassphrase",
+  "Avoid common words and patterns": "strength.avoidCommon",
+  "Use at least 12 characters for a stronger passphrase": "strength.useTwelve"
+};
 function translateStrengthAssessment(assessment) {
-  const labelKeys = {
-    "Very weak": "strength.veryWeak",
-    Weak: "strength.weak",
-    Fair: "strength.fair",
-    Good: "strength.good",
-    Strong: "strength.strong"
-  };
-  const warningKeys = {
-    "Enter a passphrase": "strength.enterPassphrase",
-    "Avoid common words and patterns": "strength.avoidCommon",
-    "Use at least 12 characters for a stronger passphrase": "strength.useTwelve"
-  };
   return {
     ...assessment,
-    label: labelKeys[assessment?.label] ? t(labelKeys[assessment.label]) : assessment?.label,
-    warnings: (assessment?.warnings || []).map((warning) => warningKeys[warning] ? t(warningKeys[warning]) : warning)
+    label: STRENGTH_LABEL_KEYS[assessment?.label] ? t(STRENGTH_LABEL_KEYS[assessment.label]) : assessment?.label,
+    warnings: (assessment?.warnings || []).map((warning) => STRENGTH_WARNING_KEYS[warning] ? t(STRENGTH_WARNING_KEYS[warning]) : warning)
   };
 }
 
@@ -15065,11 +15069,8 @@ function applyLocale() {
   updateDataSafetyBanners();
   renderBiometricControls();
 }
-function applyStaticStrings() {
-  applyLocale();
-}
 function initialize() {
-  applyStaticStrings();
+  applyLocale();
   syncSettingsUI();
   applyVisualSettings();
   loadVaultOnStartup();
