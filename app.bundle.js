@@ -12576,8 +12576,8 @@ function parseAegisExport(data) {
         secret: raw?.token?.secret,
         type: raw?.type,
         algorithm: raw?.token?.algorithm,
-        digits: raw?.token?.digits,
-        period: raw?.token?.period,
+        digits: raw?.token?.digits ?? 6,
+        period: raw?.token?.period ?? 30,
         counter: raw?.token?.counter,
         tags: Array.isArray(raw?.tags) ? raw.tags : []
       }));
@@ -12616,8 +12616,8 @@ function parse2FasExport(data) {
         secret: otp.secret ?? raw?.secret,
         type: otp.tokenType,
         algorithm: otp.algorithm,
-        digits: otp.digits,
-        period: otp.period,
+        digits: otp.digits ?? 6,
+        period: otp.period ?? 30,
         counter: otp.counter,
         tags
       }));
@@ -13048,6 +13048,7 @@ var KDF_PARAMS_LEGACY = Object.freeze({
   hash: "SHA-256",
   saltBytes: 16
 });
+var KDF_ITERATIONS_CEILING = 5e6;
 function toBase64(uint8) {
   if (typeof Buffer !== "undefined") {
     return Buffer.from(uint8).toString("base64");
@@ -13095,6 +13096,14 @@ async function computeBackupMac(payloadJson, passphrase, saltBytes, params, cryp
   const signature = await safeCrypto.subtle.sign("HMAC", macKey, encoder.encode(payloadJson));
   return [...new Uint8Array(signature)].map((part) => part.toString(16).padStart(2, "0")).join("");
 }
+function constantTimeHexEqual(left, right) {
+  if (typeof left !== "string" || typeof right !== "string" || left.length !== right.length) return false;
+  let diff = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    diff |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return diff === 0;
+}
 async function verifyBackupMac(backup, passphrase, cryptoApi = globalThis.crypto) {
   if (!backup || typeof backup !== "object" || backup.version !== BACKUP_VERSION) return false;
   const vault = backup.payload?.vault;
@@ -13111,7 +13120,7 @@ async function verifyBackupMac(backup, passphrase, cryptoApi = globalThis.crypto
       params,
       cryptoApi
     );
-    return expected === backup.mac;
+    return constantTimeHexEqual(expected, backup.mac);
   } catch {
     return false;
   }
@@ -13166,7 +13175,7 @@ function validateKdfParams(kdf) {
   if (kdf.algorithm !== "PBKDF2" || kdf.hash !== "SHA-256") {
     throw new OtpVaultError("Encrypted data uses an unsupported KDF", { code: "VAULT_FIELDS" });
   }
-  if (!Number.isInteger(kdf.iterations) || kdf.iterations <= 0) {
+  if (!Number.isInteger(kdf.iterations) || kdf.iterations <= 0 || kdf.iterations > KDF_ITERATIONS_CEILING) {
     throw new OtpVaultError("Encrypted data has an invalid kdf block", { code: "VAULT_FIELDS" });
   }
   if (kdf.saltBytes !== void 0 && (!Number.isInteger(kdf.saltBytes) || kdf.saltBytes <= 0)) {
@@ -14007,7 +14016,6 @@ var en = {
   // Google Authenticator camera + undo
   "undo.entryRemovedOne": "Entry removed",
   "undo.entryRemovedMany": "{count} entries removed",
-  "undo.removedEntries": "{count} entr{plural} removed",
   // Copy history
   "history.eyebrow": "recent activity",
   "history.heading": "Copy History",
@@ -14127,6 +14135,7 @@ var en = {
   "backup.reviewVerified": "Backup checksum verified. Choose merge to keep existing entries or replace to overwrite the vault.",
   "backup.reviewVerifiedKeyed": "Backup checksum verified with keyed authenticity. Choose merge to keep existing entries or replace to overwrite the vault.",
   "backup.reviewLegacy": "Legacy backup detected. Import is supported, but integrity could not be verified.",
+  "backup.reviewNoMac": "Encrypted backup without keyed authenticity (v2 or earlier). It imports, but the file's origin could not be verified.",
   "backup.legacyStatus": "Legacy backup detected. Importing without checksum verification.",
   "backup.passphrasePrompt": "Backup is encrypted. Enter the backup passphrase:",
   "backup.importCancelledNoPassphrase": "Backup import cancelled",
@@ -14300,6 +14309,7 @@ var en = {
   "import.qrNotDetectedImage": "Could not detect a QR code in that image",
   "import.qrUrlDownloadFailed": "Could not download QR image URL",
   "import.commitFailed": "Could not import entries",
+  "import.fileTooLarge": "Import file exceeds the 8 MB limit",
   "import.mapFailed": "An entry could not be mapped",
   "backup.lastExportShortSuffix": ". A cancelled download cannot be detected.",
   "ext.qrImportFailed": "Could not import QR file",
@@ -14505,7 +14515,6 @@ var vi = {
   "import.appsReading": "\u0110ang gi\u1EA3i m\xE3 b\u1EA3n xu\u1EA5t Aegis / 2FAS...",
   "undo.entryRemovedOne": "\u0110\xE3 x\xF3a m\u1EE5c",
   "undo.entryRemovedMany": "\u0110\xE3 x\xF3a {count} m\u1EE5c",
-  "undo.removedEntries": "\u0110\xE3 x\xF3a {count} m\u1EE5c",
   "history.eyebrow": "ho\u1EA1t \u0111\u1ED9ng g\u1EA7n \u0111\xE2y",
   "history.heading": "L\u1ECBch s\u1EED sao ch\xE9p",
   "history.empty": "Ch\u01B0a c\xF3 m\xE3 n\xE0o \u0111\u01B0\u1EE3c sao ch\xE9p. V\xE0i m\xE3 OTP g\u1EA7n nh\u1EA5t s\u1EBD hi\u1EC7n \u1EDF \u0111\xE2y \u0111\u1EC3 tra nhanh.",
@@ -14618,6 +14627,7 @@ var vi = {
   "backup.reviewVerified": "\u0110\xE3 x\xE1c minh checksum b\u1EA3n sao l\u01B0u. Ch\u1ECDn G\u1ED9p \u0111\u1EC3 gi\u1EEF c\xE1c m\u1EE5c hi\u1EC7n c\xF3 ho\u1EB7c Thay th\u1EBF \u0111\u1EC3 ghi \u0111\xE8 kho.",
   "backup.reviewVerifiedKeyed": "\u0110\xE3 x\xE1c minh checksum v\u1EDBi x\xE1c th\u1EF1c kh\xF3a. Ch\u1ECDn G\u1ED9p \u0111\u1EC3 gi\u1EEF c\xE1c m\u1EE5c hi\u1EC7n c\xF3 ho\u1EB7c Thay th\u1EBF \u0111\u1EC3 ghi \u0111\xE8 kho.",
   "backup.reviewLegacy": "Ph\xE1t hi\u1EC7n b\u1EA3n sao l\u01B0u c\u0169. V\u1EABn nh\u1EADp \u0111\u01B0\u1EE3c nh\u01B0ng kh\xF4ng th\u1EC3 x\xE1c minh to\xE0n v\u1EB9n.",
+  "backup.reviewNoMac": "B\u1EA3n sao l\u01B0u m\xE3 h\xF3a kh\xF4ng c\xF3 x\xE1c th\u1EF1c kh\xF3a (v2 tr\u1EDF v\u1EC1 tr\u01B0\u1EDBc). V\u1EABn nh\u1EADp \u0111\u01B0\u1EE3c nh\u01B0ng kh\xF4ng th\u1EC3 x\xE1c minh ngu\u1ED3n g\u1ED1c t\u1EC7p.",
   "backup.legacyStatus": "Ph\xE1t hi\u1EC7n b\u1EA3n sao l\u01B0u c\u0169. Nh\u1EADp m\xE0 kh\xF4ng x\xE1c minh checksum.",
   "backup.passphrasePrompt": "B\u1EA3n sao l\u01B0u \u0111\u01B0\u1EE3c m\xE3 h\xF3a. Nh\u1EADp passphrase c\u1EE7a b\u1EA3n sao l\u01B0u:",
   "backup.importCancelledNoPassphrase": "\u0110\xE3 h\u1EE7y nh\u1EADp b\u1EA3n sao l\u01B0u",
@@ -14786,6 +14796,7 @@ var vi = {
   "import.qrNotDetectedImage": "Kh\xF4ng ph\xE1t hi\u1EC7n m\xE3 QR trong \u1EA3nh \u0111\xF3",
   "import.qrUrlDownloadFailed": "Kh\xF4ng th\u1EC3 t\u1EA3i \u1EA3nh QR t\u1EEB URL",
   "import.commitFailed": "Kh\xF4ng th\u1EC3 nh\u1EADp c\xE1c m\u1EE5c",
+  "import.fileTooLarge": "T\u1EC7p nh\u1EADp v\u01B0\u1EE3t qu\xE1 gi\u1EDBi h\u1EA1n 8 MB",
   "import.mapFailed": "Kh\xF4ng th\u1EC3 \xE1nh x\u1EA1 m\u1ED9t m\u1EE5c",
   "backup.lastExportShortSuffix": ". Kh\xF4ng th\u1EC3 ph\xE1t hi\u1EC7n l\u01B0\u1EE3t t\u1EA3i b\u1ECB h\u1EE7y.",
   "ext.qrImportFailed": "Kh\xF4ng th\u1EC3 nh\u1EADp t\u1EC7p QR",
@@ -16834,7 +16845,7 @@ function renderBackupReview(backup) {
     t("backup.vaultSize", { count: entries.length })
   ];
   if (backup.invalidItemCount > 0) {
-    summaryItems.push(t("backup.invalidSkipped", { count: backup.invalidItemCount, plural: backup.invalidItemCount === 1 ? "y" : "ies" }));
+    summaryItems.push(t("backup.invalidSkipped", { count: backup.invalidItemCount, plural: backup.invalidItemCount === 1 ? "" : "s" }));
   }
   if (mode === "merge" && backupEntries.length > 0 && entries.length > 0) {
     const duplicates = backupEntries.filter(
@@ -16850,10 +16861,12 @@ function renderBackupReview(backup) {
     backupReviewSummary.appendChild(row);
   });
   backupPassphraseRow?.classList.toggle("hidden", !backup.encrypted);
+  const verified = backup.integrity === "verified";
+  const unkeyedEncrypted = verified && backup.encrypted && !backup.macProtected;
   setStatus(
     backupReviewStatus,
-    backup.integrity === "verified" ? backup.macProtected ? t("backup.reviewVerifiedKeyed") : t("backup.reviewVerified") : t("backup.reviewLegacy"),
-    backup.integrity === "verified" ? "success" : "warning"
+    !verified ? t("backup.reviewLegacy") : unkeyedEncrypted ? t("backup.reviewNoMac") : backup.macProtected ? t("backup.reviewVerifiedKeyed") : t("backup.reviewVerified"),
+    verified && !unkeyedEncrypted ? "success" : "warning"
   );
 }
 async function importBackupFile(file, backup = null, rawBackup = null) {
@@ -16955,6 +16968,9 @@ async function openQrExport(entry) {
   }
 }
 async function importThirdPartyFile(file) {
+  if (file.size > MAX_IMPORT_FILE_BYTES) {
+    throw new Error(t("import.fileTooLarge"));
+  }
   const text = await file.text();
   const result = parseThirdPartyImport(text);
   const warnings = [...result.warnings];

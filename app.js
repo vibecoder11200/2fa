@@ -23,7 +23,7 @@ import {
   reportError,
   toUserMessage,
 } from './lib/otp.js';
-import { parseThirdPartyImport } from './lib/importers.js';
+import { MAX_IMPORT_FILE_BYTES, parseThirdPartyImport } from './lib/importers.js';
 import {
   MAX_STITCHED_ENTRIES,
   migrationToEntryCandidates,
@@ -2191,7 +2191,7 @@ function renderBackupReview(backup) {
   ];
 
   if (backup.invalidItemCount > 0) {
-    summaryItems.push(t("backup.invalidSkipped", { count: backup.invalidItemCount, plural: backup.invalidItemCount === 1 ? "y" : "ies" }));
+    summaryItems.push(t("backup.invalidSkipped", { count: backup.invalidItemCount, plural: backup.invalidItemCount === 1 ? "" : "s" }));
   }
 
   if (mode === "merge" && backupEntries.length > 0 && entries.length > 0) {
@@ -2209,12 +2209,18 @@ function renderBackupReview(backup) {
     backupReviewSummary.appendChild(row);
   });
   backupPassphraseRow?.classList.toggle("hidden", !backup.encrypted);
+  // An encrypted backup without a keyed mac (v2 or earlier) imports, but the
+  // version field inside the unkeyed-checksum region is downgradable, so the
+  // missing authenticity signal is surfaced as a warning, not success.
+  const verified = backup.integrity === "verified";
+  const unkeyedEncrypted = verified && backup.encrypted && !backup.macProtected;
   setStatus(
     backupReviewStatus,
-    backup.integrity === "verified"
-      ? (backup.macProtected ? t("backup.reviewVerifiedKeyed") : t("backup.reviewVerified"))
-      : t("backup.reviewLegacy"),
-    backup.integrity === "verified" ? "success" : "warning"
+    !verified ? t("backup.reviewLegacy")
+      : unkeyedEncrypted ? t("backup.reviewNoMac")
+      : backup.macProtected ? t("backup.reviewVerifiedKeyed")
+      : t("backup.reviewVerified"),
+    verified && !unkeyedEncrypted ? "success" : "warning"
   );
 }
 async function importBackupFile(file, backup = null, rawBackup = null) {
@@ -2323,6 +2329,9 @@ async function openQrExport(entry) {
 // --- Aegis / 2FAS export import (file-based third-party migration) ---
 
 async function importThirdPartyFile(file) {
+  if (file.size > MAX_IMPORT_FILE_BYTES) {
+    throw new Error(t("import.fileTooLarge"));
+  }
   const text = await file.text();
   const result = parseThirdPartyImport(text);
   const warnings = [...result.warnings];

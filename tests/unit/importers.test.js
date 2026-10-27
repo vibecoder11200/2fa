@@ -127,6 +127,26 @@ describe("third-party importers", () => {
     );
   });
 
+  it("defaults missing digits and period to 6 and 30", () => {
+    const minimal = {
+      header: {},
+      db: {
+        entries: [
+          {
+            type: "totp",
+            name: "Minimal:entry",
+            issuer: "Minimal",
+            token: { secret: "JBSWY3DPEHPK3PXP", algorithm: "SHA1" },
+          },
+        ],
+      },
+    };
+    const { entries: parsed, warnings } = parseAegisExport(minimal);
+
+    expect(warnings).toHaveLength(0);
+    expect(parsed[0]).toEqual(expect.objectContaining({ digits: 6, period: 30 }));
+  });
+
   it("rejects files that are not Aegis exports", () => {
     expect(() => parseAegisExport({ version: 3, header: {} })).toThrow("does not look like an Aegis export");
   });

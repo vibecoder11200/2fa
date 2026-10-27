@@ -110,6 +110,28 @@ describe("vault helpers", () => {
     expect(decrypted).toEqual([expect.objectContaining(entries[0])]);
   });
 
+  it("rejects kdf iterations above the sanity ceiling with VAULT_FIELDS", async () => {
+    const base = await encryptEntries(entries, "correct horse battery");
+    const bloated = { ...base, kdf: { ...base.kdf, iterations: 10000000 } };
+
+    expect(isLegacyEncryptedPayload(bloated)).toBe(false);
+    await expect(decryptVaultEntries(bloated, "correct horse battery")).rejects.toMatchObject({
+      code: "VAULT_FIELDS",
+    });
+    // The mac derivation resolves kdf params from the file too, so a crafted
+    // huge-iteration v3 backup fails closed instead of wedging the tab.
+    const craftedV3 = {
+      version: 3,
+      encrypted: true,
+      createdAt: null,
+      itemCount: 0,
+      checksum: "0".repeat(64),
+      mac: "a".repeat(64),
+      payload: { schemaVersion: 1, vault: bloated },
+    };
+    expect(await verifyBackupMac(craftedV3, "correct horse battery")).toBe(false);
+  });
+
   it("rejects malformed kdf blocks with VAULT_FIELDS", async () => {
     const base = await encryptEntries(entries, "correct horse battery");
     const malformedCases = [

@@ -19,7 +19,7 @@ import {
   toUserMessage,
 } from "../lib/otp.js";
 import { applyTranslations, resolveLocale, setLocale, t, translateStrengthAssessment } from "../lib/i18n.js";
-import { parseThirdPartyImport } from "../lib/importers.js";
+import { MAX_IMPORT_FILE_BYTES, parseThirdPartyImport } from "../lib/importers.js";
 import {
   migrationToEntryCandidates,
   parseMigrationUri,
@@ -1531,6 +1531,9 @@ async function importFromQrFile(file) {
 // --- Aegis / 2FAS export import (file-based third-party migration) ---
 
 async function importThirdPartyFile(file) {
+  if (file.size > MAX_IMPORT_FILE_BYTES) {
+    throw new Error(t("import.fileTooLarge"));
+  }
   const text = await file.text();
   const result = parseThirdPartyImport(text);
   const warnings = [...result.warnings];
