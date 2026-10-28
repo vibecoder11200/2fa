@@ -1,15 +1,15 @@
 # Project Roadmap
 
-Last updated: 2026-10-27
+Last updated: 2026-10-28
 
-## Current Status: Unreleased wave on top of 0.3.0
+## Current Status: 0.4.0 Released
 
 The Personal OTP Vault shipped the 0.3.0 product UI redesign (token system,
-codes-first shell, slide-over sheets) and is carrying an unreleased
-migration-and-language wave: Aegis + 2FAS import, single-entry QR export,
-complete i18n with a full Vietnamese translation plus a Language setting, an
-extension keyboard shortcut, and backup format v3 with a keyed HMAC checksum
-(authenticity, closing the integrity-only caveat).
+codes-first shell, slide-over sheets) and released it together with the
+migration-and-language wave as 0.4.0: Aegis + 2FAS import, single-entry QR
+export, complete i18n with a full Vietnamese translation plus a Language
+setting, an extension keyboard shortcut, and backup format v3 with a keyed
+HMAC checksum (authenticity, closing the integrity-only caveat).
 
 ## Completed Features (Done)
 

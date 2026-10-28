@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 — 2026-10-28
 
 A migration-and-language wave: imports from Aegis and 2FAS, single-entry QR
 export, full i18n with a complete Vietnamese translation, and backup format
